@@ -70,10 +70,29 @@ Hashing guarantees:
 
 ---
 
-## Next up (Task 2.3)
-- Implement hierarchy ordering + priority sorting
-- Implement conflict rules:
-  - **DENY overrides ALLOW**
-  - **more specific overrides more general**
-- Start producing a real `DecisionTrace` (we’ll carry it forward into Phase 3 API responses)
+## Task 2.3 — Hierarchy ordering + conflict rules + trace (done)
+
+### What changed
+- The engine now produces an **engine-level** trace:
+  - `backend/src/main/java/com/vault/engine/DecisionTraceEntry.java`
+  - `backend/src/main/java/com/vault/engine/DecisionTrace.java`
+  - `backend/src/main/java/com/vault/engine/EngineResult.java`
+- `DecisionEngineService.evaluate(...)` now returns `EngineResult` and:
+  - evaluates rules in a deterministic order (hierarchy rank → priority → id)
+  - records each evaluated rule into the trace
+  - resolves the final decision via a dedicated resolver
+
+### Conflict rules (current implementation)
+- **Default deny**: no trace entries → DENY
+- **DENY overrides ALLOW**: any deny entry → DENY
+
+Resolver implementation:
+- `backend/src/main/java/com/vault/engine/DecisionResolver.java`
+- Tests:
+  - `backend/src/test/java/com/vault/engine/DecisionResolverTest.java`
+
+### What’s intentionally still TODO
+- “Specific overrides general” is not fully modeled yet. Today we record hierarchy in the trace,
+  but resolution is strictly “deny wins”.
+  - Next we’ll incorporate specificity/priority for cases like variants while still respecting default-deny safety.
 
