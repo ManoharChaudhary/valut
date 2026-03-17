@@ -13,7 +13,7 @@ This folder is the long-lived “engineering journal” for the Vault project.
 ## Phase notes
 - [phase-01-foundation.md](phase-01-foundation.md)
 - [phase-02-core-engine.md](phase-02-core-engine.md)
-- phase-03-schema-validation-and-api.md (coming later)
+- [phase-03-schema-validation-and-api.md](phase-03-schema-validation-and-api.md)
 - phase-04-caching-and-events.md (coming later)
 - phase-05-frontend-control-plane.md (coming later)
 

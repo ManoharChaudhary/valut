@@ -7,31 +7,51 @@ import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
+import com.vault.features.FeatureDefinition;
+import com.vault.features.FeatureDefinitionRepository;
 import com.vault.rules.HierarchyLevel;
 import com.vault.rules.Rule;
 import com.vault.rules.RuleRepository;
 import com.vault.rules.RuleVersion;
 import com.vault.rules.RuleVersionRepository;
+import com.vault.validation.ContextSchemaValidator;
+import com.vault.validation.ContextValidationResult;
 
 @Service
 public class DecisionEngineService {
+	private final FeatureDefinitionRepository featureDefinitionRepository;
 	private final RuleRepository ruleRepository;
 	private final RuleVersionRepository ruleVersionRepository;
+	private final ContextSchemaValidator contextSchemaValidator;
 	private final List<RuleEvaluatorStrategy> evaluators;
 
 	public DecisionEngineService(
+			FeatureDefinitionRepository featureDefinitionRepository,
 			RuleRepository ruleRepository,
 			RuleVersionRepository ruleVersionRepository,
+			ContextSchemaValidator contextSchemaValidator,
 			List<RuleEvaluatorStrategy> evaluators
 	) {
+		this.featureDefinitionRepository = featureDefinitionRepository;
 		this.ruleRepository = ruleRepository;
 		this.ruleVersionRepository = ruleVersionRepository;
+		this.contextSchemaValidator = contextSchemaValidator;
 		this.evaluators = evaluators;
 	}
 
 	public EngineResult evaluate(String featureKey, Map<String, Object> context) {
 		if (featureKey == null || featureKey.isBlank()) {
 			return new EngineResult(Decision.DENY, List.of("missing featureKey"), new DecisionTrace(List.of()));
+		}
+
+		FeatureDefinition featureDefinition = featureDefinitionRepository.findByFeatureKey(featureKey).orElse(null);
+		if (featureDefinition == null) {
+			return new EngineResult(Decision.DENY, List.of("feature definition not found"), new DecisionTrace(List.of()));
+		}
+
+		ContextValidationResult validation = contextSchemaValidator.validate(featureDefinition.getContextSchema(), context);
+		if (!validation.valid()) {
+			return new EngineResult(Decision.DENY, validation.errors(), new DecisionTrace(List.of()));
 		}
 
 		List<Rule> rules = ruleRepository.findByFeatureKeyAndActiveTrue(featureKey);
@@ -54,7 +74,7 @@ public class DecisionEngineService {
 				)
 				.toList();
 
-		for (Rule rule : rules) {
+		for (Rule rule : ordered) {
 			RuleVersion latest = ruleVersionRepository.findByRuleIdOrderByIdDesc(rule.getId()).stream().findFirst().orElse(null);
 			if (latest == null) {
 				continue;
