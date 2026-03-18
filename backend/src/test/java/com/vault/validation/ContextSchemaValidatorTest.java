@@ -10,7 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 class ContextSchemaValidatorTest {
 	private final ObjectMapper objectMapper = new ObjectMapper();
-	private final ContextSchemaValidator validator = new ContextSchemaValidator(objectMapper);
+	private final ContextSchemaValidator validator = new ContextSchemaValidator();
 
 	@Test
 	void validContextPassesSchema() throws Exception {

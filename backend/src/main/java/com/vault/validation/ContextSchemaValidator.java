@@ -15,11 +15,10 @@ import com.networknt.schema.ValidationMessage;
 
 @Component
 public class ContextSchemaValidator {
-	private final ObjectMapper objectMapper;
+	private final ObjectMapper objectMapper = new ObjectMapper();
 	private final JsonSchemaFactory schemaFactory;
 
-	public ContextSchemaValidator(ObjectMapper objectMapper) {
-		this.objectMapper = objectMapper;
+	public ContextSchemaValidator() {
 		this.schemaFactory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
 	}
 
