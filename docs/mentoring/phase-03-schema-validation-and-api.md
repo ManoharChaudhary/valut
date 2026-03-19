@@ -29,3 +29,31 @@ We intentionally used NetworkNT `1.5.9` right now because newer `3.x` changed AP
   - valid context passes
   - invalid context fails with errors
 
+---
+
+## Task 3.2 — Decision REST endpoint (done)
+
+### What we added
+- `backend/src/main/java/com/vault/api/decisions/DecisionController.java`
+  - `POST /api/v1/decisions/evaluate`
+- Request / response DTOs:
+  - `EvaluateRequest` — `featureKey` (required), `context` (optional object, defaults to empty)
+  - `EvaluateResponse` — `decision` (ALLOW|DENY), `reasons`, `trace` (list of step entries)
+- `backend/src/test/java/com/vault/api/decisions/DecisionControllerTest.java`
+  - standalone `MockMvc` + Mockito (no full Spring context; avoids Boot 4 slice package moves)
+
+### Why controller is thin
+`@RestController` only maps HTTP to the engine service and shapes JSON.
+Business rules stay in `DecisionEngineService` (validation → evaluate → trace).
+
+### Verify with curl (local profile, port 8080)
+Requires rows in `feature_definitions` and matching rules for a meaningful ALLOW; otherwise you still get a structured DENY.
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/decisions/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{"featureKey":"your.feature","context":{"tenant_id":"t-1"}}'
+```
+
+Invalid body (blank `featureKey`) returns **400** from Bean Validation.
+
