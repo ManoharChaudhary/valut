@@ -3,7 +3,9 @@ package com.vault.api.decisions;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -63,6 +65,13 @@ class DecisionControllerTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.decision").value("ALLOW"))
 				.andExpect(jsonPath("$.reasons[0]").value("ok"));
+	}
+
+	@Test
+	void evaluateGetReturnsMethodNotAllowed() throws Exception {
+		mockMvc.perform(get("/api/v1/decisions/evaluate"))
+				.andExpect(status().isMethodNotAllowed())
+				.andExpect(header().string("Allow", "POST"));
 	}
 
 	@Test

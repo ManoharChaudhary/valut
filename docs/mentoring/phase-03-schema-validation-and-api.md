@@ -49,6 +49,8 @@ Business rules stay in `DecisionEngineService` (validation → evaluate → trac
 ### Verify with curl (local profile, port 8080)
 Requires rows in `feature_definitions` and matching rules for a meaningful ALLOW; otherwise you still get a structured DENY.
 
+**Use POST.** A browser address bar issues **GET**, which does not hit the evaluate handler (you may see **404** or **405** depending on Spring version; we map GET to **405** with `Allow: POST` for clarity).
+
 ```bash
 curl -s -X POST http://localhost:8080/api/v1/decisions/evaluate \
   -H "Content-Type: application/json" \
