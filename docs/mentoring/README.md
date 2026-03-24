@@ -5,6 +5,11 @@ This folder is the long-lived “engineering journal” for the Vault project.
 ## Start here (frontend → backend bridge)
 - [backend-foundations-and-request-flow.md](backend-foundations-and-request-flow.md) — HTTP → MVC → validation → services → JPA → DB, with diagrams, analogies, and debugging.
 
+## Companion guides (add as you go)
+- [how-to-run-and-verify.md](how-to-run-and-verify.md) — commands and smoke checks.
+- [troubleshooting.md](troubleshooting.md) — common failures we already hit in this repo.
+- [spring-and-jpa-primer.md](spring-and-jpa-primer.md) — annotation / concept cheat sheet.
+
 ## How to use
 - Read **phase notes** in order. Each phase doc contains:
   - What we built
