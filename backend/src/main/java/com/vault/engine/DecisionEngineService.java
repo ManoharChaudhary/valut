@@ -41,22 +41,42 @@ public class DecisionEngineService {
 
 	public EngineResult evaluate(String featureKey, Map<String, Object> context) {
 		if (featureKey == null || featureKey.isBlank()) {
-			return new EngineResult(Decision.DENY, List.of("missing featureKey"), new DecisionTrace(List.of()));
+			return new EngineResult(
+					Decision.DENY,
+					List.of("missing featureKey"),
+					new DecisionTrace(List.of()),
+					DecisionTraceSummary.preEvaluation("Missing featureKey; request rejected before evaluation.")
+			);
 		}
 
 		FeatureDefinition featureDefinition = featureDefinitionRepository.findByFeatureKey(featureKey).orElse(null);
 		if (featureDefinition == null) {
-			return new EngineResult(Decision.DENY, List.of("feature definition not found"), new DecisionTrace(List.of()));
+			return new EngineResult(
+					Decision.DENY,
+					List.of("feature definition not found"),
+					new DecisionTrace(List.of()),
+					DecisionTraceSummary.preEvaluation("No FeatureDefinition row for this featureKey; default deny.")
+			);
 		}
 
 		ContextValidationResult validation = contextSchemaValidator.validate(featureDefinition.getContextSchema(), context);
 		if (!validation.valid()) {
-			return new EngineResult(Decision.DENY, validation.errors(), new DecisionTrace(List.of()));
+			return new EngineResult(
+					Decision.DENY,
+					validation.errors(),
+					new DecisionTrace(List.of()),
+					DecisionTraceSummary.preEvaluation("Context failed JSON Schema validation; rules were not evaluated.")
+			);
 		}
 
 		List<Rule> rules = ruleRepository.findByFeatureKeyAndActiveTrue(featureKey);
 		if (rules.isEmpty()) {
-			return new EngineResult(Decision.DENY, List.of("no active rules for feature"), new DecisionTrace(List.of()));
+			return new EngineResult(
+					Decision.DENY,
+					List.of("no active rules for feature"),
+					new DecisionTrace(List.of()),
+					DecisionTraceSummary.preEvaluation("No active rules for this feature; default deny.")
+			);
 		}
 
 		List<DecisionTraceEntry> traceEntries = new ArrayList<>();
@@ -111,7 +131,8 @@ public class DecisionEngineService {
 
 		Decision finalDecision = DecisionResolver.resolve(traceEntries);
 		List<String> reasons = traceEntries.stream().map(DecisionTraceEntry::reason).toList();
-		return new EngineResult(finalDecision, reasons, new DecisionTrace(traceEntries));
+		DecisionTraceSummary traceSummary = DecisionTraceSummary.fromTrace(traceEntries, finalDecision);
+		return new EngineResult(finalDecision, reasons, new DecisionTrace(traceEntries), traceSummary);
 	}
 
 	static int hierarchyRank(HierarchyLevel level) {

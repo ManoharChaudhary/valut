@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vault.engine.Decision;
 import com.vault.engine.DecisionEngineService;
 import com.vault.engine.DecisionTrace;
+import com.vault.engine.DecisionTraceSummary;
 import com.vault.engine.EngineResult;
 
 @ExtendWith(MockitoExtension.class)
@@ -51,7 +52,8 @@ class DecisionControllerTest {
 				.thenReturn(new EngineResult(
 						Decision.ALLOW,
 						List.of("ok"),
-						new DecisionTrace(List.of())
+						new DecisionTrace(List.of()),
+						DecisionTraceSummary.preEvaluation("stub summary")
 				));
 
 		var body = Map.of(
@@ -64,6 +66,7 @@ class DecisionControllerTest {
 				.content(objectMapper.writeValueAsString(body)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.decision").value("ALLOW"))
+				.andExpect(jsonPath("$.summary").value("stub summary"))
 				.andExpect(jsonPath("$.reasons[0]").value("ok"));
 	}
 

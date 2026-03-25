@@ -59,3 +59,26 @@ curl -s -X POST http://localhost:8080/api/v1/decisions/evaluate \
 
 Invalid body (blank `featureKey`) returns **400** from Bean Validation.
 
+---
+
+## Task 3.3 — Decision trace in API responses (done)
+
+### Response shape additions
+`EvaluateResponse` now includes:
+- **`summary`** — one human-oriented line explaining the outcome (and pre-rule failures).
+- **`evaluationPath`** — ordered strings, one per evaluated rule step (hierarchy, ids, per-rule decision, reason).
+- **`matchedRuleId` / `matchedRuleVersionId`** — primary signal for debugging:
+  - If final decision is **DENY**, matches the **first DENY** step in evaluation order (deterministic).
+  - If **ALLOW**, matches the **last ALLOW** step (broad → narrow evaluation: last is most specific).
+
+Per-step detail remains in **`trace`** (structured rows).
+
+### Engine support
+- `DecisionTraceSummary` — built in `DecisionEngineService` after rule evaluation.
+- `EngineResult` carries `traceSummary` alongside `decision`, `reasons`, and `trace`.
+
+### Tests
+- `backend/src/test/java/com/vault/engine/DecisionTraceSummaryTest.java`
+
+Example top-level JSON fields on success: `decision`, `summary`, `reasons`, `evaluationPath`, `matchedRuleId`, `matchedRuleVersionId`, `trace`.
+

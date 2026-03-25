@@ -7,16 +7,25 @@ import com.vault.engine.EngineResult;
 
 public record EvaluateResponse(
 		String decision,
+		String summary,
 		List<String> reasons,
+		List<String> evaluationPath,
+		Long matchedRuleId,
+		Long matchedRuleVersionId,
 		List<DecisionTraceEntryResponse> trace
 ) {
 	public static EvaluateResponse from(EngineResult result) {
 		List<DecisionTraceEntryResponse> traceRows = result.trace().entries().stream()
 				.map(DecisionTraceEntryResponse::from)
 				.toList();
+		var ts = result.traceSummary();
 		return new EvaluateResponse(
 				result.decision().name(),
+				ts.summary(),
 				result.reasons(),
+				ts.evaluationPath(),
+				ts.matchedRuleId(),
+				ts.matchedRuleVersionId(),
 				traceRows
 		);
 	}
