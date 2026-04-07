@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: vault-backend
+  cache:
+    type: caffeine
+    cache-names: decisions
+    caffeine:
+      spec: maximumSize=10000,expireAfterWrite=5m
   jpa:
     open-in-view: false
     properties:

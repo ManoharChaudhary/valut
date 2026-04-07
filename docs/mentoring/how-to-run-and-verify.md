@@ -60,6 +60,10 @@ order by installed_rank;
 \dt
 ```
 
+## Caching (Phase 4)
+In-memory **Caffeine** cache (`decisions`) wraps `DecisionEngineService.evaluate` with a **5 minute** write TTL (see `application.yml`). After rule changes, stale entries clear when TTL expires unless you implement eviction (Task 4.2).
+
 ## Related reading
 - [backend-foundations-and-request-flow.md](backend-foundations-and-request-flow.md)
 - [troubleshooting.md](troubleshooting.md)
+- [phase-04-caching-and-events.md](phase-04-caching-and-events.md)

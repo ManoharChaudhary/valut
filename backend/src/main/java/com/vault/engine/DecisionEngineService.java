@@ -5,6 +5,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import com.vault.features.FeatureDefinition;
@@ -39,6 +40,7 @@ public class DecisionEngineService {
 		this.evaluators = evaluators;
 	}
 
+	@Cacheable(cacheNames = "decisions", keyGenerator = "decisionEvaluationKeyGenerator")
 	public EngineResult evaluate(String featureKey, Map<String, Object> context) {
 		if (featureKey == null || featureKey.isBlank()) {
 			return new EngineResult(
