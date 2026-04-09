@@ -61,7 +61,7 @@ order by installed_rank;
 ```
 
 ## Caching (Phase 4)
-In-memory **Caffeine** cache (`decisions`) wraps `DecisionEngineService.evaluate` with a **5 minute** write TTL (see `application.yml`). After rule changes, stale entries clear when TTL expires unless you implement eviction (Task 4.2).
+In-memory **Caffeine** cache (`decisions`) wraps `DecisionEngineService.evaluate` with a **5 minute** write TTL (see `application.yml`). After **`RuleAdminService.appendRuleVersion`**, a `RuleUpdatedEvent` clears the `decisions` cache so clients are not stuck until TTL (see Phase 4 Task 4.2).
 
 ## Related reading
 - [backend-foundations-and-request-flow.md](backend-foundations-and-request-flow.md)

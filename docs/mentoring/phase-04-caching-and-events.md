@@ -28,5 +28,25 @@ Rough analogy: a **memoized** pure function wrapper around your server handler �
 1. Run the app; call `POST /evaluate` twice with the same body; second call should be faster (hard to see without metrics — optional future: log cache hit).
 2. Run unit test: `DecisionEvaluationKeyGeneratorTest` proves stable keys for different `Map` insertion orders.
 
-### Next (Task 4.2)
-- Publish `RuleUpdatedEvent` on rule mutations and `@CacheListener` / `@CacheEvict` to drop stale `decisions` entries (feature-scoped eviction first).
+## Task 4.2 — Spring events + cache eviction (done)
+
+### What we added
+- **`RuleUpdatedEvent`** — `backend/src/main/java/com/vault/rules/RuleUpdatedEvent.java` (carries `featureKey` + `ruleId`).
+- **`RuleAdminService`** — `backend/src/main/java/com/vault/rules/RuleAdminService.java`
+  - `appendRuleVersion(...)` saves a new `RuleVersion` and publishes **`RuleUpdatedEvent`** after persist (same `@Transactional` boundary).
+  - Use this (or the same event) for future admin REST so caches stay coherent.
+- **`RuleCacheEvictionListener`** — `backend/src/main/java/com/vault/cache/RuleCacheEvictionListener.java`
+  - `@EventListener` clears the **`decisions`** cache via `CacheManager`.
+  - **MVP:** `cache.clear()` evicts all entries (simple, always correct). TODO: feature-scoped eviction.
+
+### Mentoring: application events
+`ApplicationEventPublisher` lets **writers** avoid depending on **every** downstream reaction (cache, audit, analytics).
+
+Frontend analogy: an internal **event bus** / **emitter** so `ruleSaved` triggers listeners without circular imports.
+
+### Tests
+- `backend/src/test/java/com/vault/cache/RuleCacheEvictionListenerTest.java`
+- `backend/src/test/java/com/vault/rules/RuleAdminServiceTest.java`
+
+### Next (Phase 5)
+- Next.js control plane + simulator UI calling `POST /evaluate`.

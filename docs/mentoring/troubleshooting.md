@@ -49,6 +49,11 @@ Symptoms-first guide. Pair with [how-to-run-and-verify.md](how-to-run-and-verify
 **Symptom:** JDBC errors, Flyway cannot connect.  
 **Fix:** Start Postgres; verify URL/user/password in `application-local.yml`.
 
+## Stale decision right after a rule change
+**Symptom:** Evaluate returns old outcome until TTL passes.  
+**Cause:** Before Task 4.2 only TTL expiry refreshed cache; now `RuleAdminService.appendRuleVersion` publishes `RuleUpdatedEvent` and the listener clears `decisions`.  
+**Fix:** Ensure rule mutations go through `RuleAdminService` (or publish the same event). If you bypass it, restart the app or wait for TTL.
+
 ## Git / Xcode command line tools
 **Symptom:** `xcode-select` errors when running `git`.  
 **Fix:** Install Apple Command Line Tools or Xcode.
