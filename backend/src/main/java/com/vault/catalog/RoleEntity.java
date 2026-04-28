@@ -1,4 +1,4 @@
-package com.vault.tenancy;
+package com.vault.catalog;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -9,16 +9,14 @@ import org.hibernate.type.SqlTypes;
 import jakarta.persistence.Column;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "tenants")
-public class Tenant {
+@Table(name = "roles")
+public class RoleEntity {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
@@ -27,12 +25,8 @@ public class Tenant {
 	@Column(name = "public_id", nullable = false, unique = true)
 	private UUID publicId;
 
-	@Column(nullable = false)
+	@Column(nullable = false, unique = true)
 	private String name;
-
-	@Enumerated(EnumType.STRING)
-	@Column(nullable = false)
-	private TenantStatus status;
 
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt;
@@ -61,14 +55,6 @@ public class Tenant {
 		this.name = name;
 	}
 
-	public TenantStatus getStatus() {
-		return status;
-	}
-
-	public void setStatus(TenantStatus status) {
-		this.status = status;
-	}
-
 	public Instant getCreatedAt() {
 		return createdAt;
 	}
@@ -87,4 +73,3 @@ public class Tenant {
 		}
 	}
 }
-

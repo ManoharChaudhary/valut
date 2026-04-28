@@ -17,6 +17,7 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vault.features.FeatureDefinition;
 
 @ExtendWith(MockitoExtension.class)
 class RuleAdminServiceTest {
@@ -38,9 +39,11 @@ class RuleAdminServiceTest {
 	void appendVersionPublishesRuleUpdatedEvent() throws Exception {
 		Rule rule = new Rule();
 		rule.setId(10L);
-		rule.setFeatureKey("flags.dark_mode");
+		FeatureDefinition fd = new FeatureDefinition();
+		fd.setFeatureKey("flags.dark_mode");
+		rule.getFeatures().add(fd);
 
-		when(ruleRepository.findById(10L)).thenReturn(Optional.of(rule));
+		when(ruleRepository.findByIdWithFeatures(10L)).thenReturn(Optional.of(rule));
 		when(ruleVersionRepository.save(any(RuleVersion.class))).thenAnswer(inv -> {
 			RuleVersion v = inv.getArgument(0);
 			v.setId(555L);
@@ -54,7 +57,7 @@ class RuleAdminServiceTest {
 
 		ArgumentCaptor<RuleUpdatedEvent> captor = ArgumentCaptor.forClass(RuleUpdatedEvent.class);
 		verify(eventPublisher).publishEvent(captor.capture());
-		assertThat(captor.getValue().featureKey()).isEqualTo("flags.dark_mode");
+		assertThat(captor.getValue().affectedFeatureKeys()).containsExactly("flags.dark_mode");
 		assertThat(captor.getValue().ruleId()).isEqualTo(10L);
 	}
 }

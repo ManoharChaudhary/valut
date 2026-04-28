@@ -18,7 +18,7 @@ public class RolloutRuleEvaluator implements RuleEvaluatorStrategy {
 	}
 
 	@Override
-	public EvaluationResult evaluate(Rule rule, RuleVersion ruleVersion, Map<String, Object> context) {
+	public EvaluationResult evaluate(Rule rule, RuleVersion ruleVersion, Map<String, Object> context, String evaluationFeatureKey) {
 		JsonNode conditions = ruleVersion.getConditions();
 		if (conditions == null) {
 			return EvaluationResult.deny("rollout rule is missing conditions");
@@ -34,7 +34,7 @@ public class RolloutRuleEvaluator implements RuleEvaluatorStrategy {
 			return EvaluationResult.deny("rollout requires context.tenant_id or context.user_id");
 		}
 
-		String key = rule.getFeatureKey() + ":" + subjectId;
+		String key = evaluationFeatureKey + ":" + subjectId;
 		int hash = MurmurHash3.murmur3_32(key);
 		int bucket = Math.floorMod(hash, 100); // 0..99 stable bucket
 

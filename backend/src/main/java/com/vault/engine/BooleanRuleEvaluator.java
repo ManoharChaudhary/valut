@@ -17,7 +17,7 @@ public class BooleanRuleEvaluator implements RuleEvaluatorStrategy {
 	}
 
 	@Override
-	public EvaluationResult evaluate(Rule rule, RuleVersion ruleVersion, Map<String, Object> context) {
+	public EvaluationResult evaluate(Rule rule, RuleVersion ruleVersion, Map<String, Object> context, String evaluationFeatureKey) {
 		JsonNode conditions = ruleVersion.getConditions();
 		if (conditions == null) {
 			return EvaluationResult.deny("boolean rule is missing conditions");

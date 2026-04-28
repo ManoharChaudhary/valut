@@ -1,6 +1,7 @@
 package com.vault.rules;
 
 import java.time.Instant;
+import java.util.List;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -35,7 +36,8 @@ public class RuleAdminService {
 			JsonNode variantValue,
 			String createdBy
 	) {
-		Rule rule = ruleRepository.findById(ruleId).orElseThrow(() -> new IllegalArgumentException("rule not found: " + ruleId));
+		Rule rule = ruleRepository.findByIdWithFeatures(ruleId)
+				.orElseThrow(() -> new IllegalArgumentException("rule not found: " + ruleId));
 
 		RuleVersion version = new RuleVersion();
 		version.setRule(rule);
@@ -45,7 +47,8 @@ public class RuleAdminService {
 		version.setCreatedAt(Instant.now());
 
 		RuleVersion saved = ruleVersionRepository.save(version);
-		eventPublisher.publishEvent(new RuleUpdatedEvent(rule.getFeatureKey(), rule.getId()));
+		List<String> keys = rule.getFeatures().stream().map(f -> f.getFeatureKey()).toList();
+		eventPublisher.publishEvent(new RuleUpdatedEvent(keys, rule.getId()));
 		return saved;
 	}
 }

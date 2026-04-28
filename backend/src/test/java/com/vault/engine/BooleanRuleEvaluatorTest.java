@@ -25,7 +25,7 @@ class BooleanRuleEvaluatorTest {
 		v.setConditions(objectMapper.readTree("{\"allow\": true}"));
 
 		BooleanRuleEvaluator evaluator = new BooleanRuleEvaluator();
-		EvaluationResult result = evaluator.evaluate(rule, v, Map.of());
+		EvaluationResult result = evaluator.evaluate(rule, v, Map.of(), "any.feature");
 
 		assertThat(result.decision()).isEqualTo(Decision.ALLOW);
 	}
@@ -40,7 +40,7 @@ class BooleanRuleEvaluatorTest {
 		v.setConditions(objectMapper.readTree("{\"allow\": false}"));
 
 		BooleanRuleEvaluator evaluator = new BooleanRuleEvaluator();
-		EvaluationResult result = evaluator.evaluate(rule, v, Map.of());
+		EvaluationResult result = evaluator.evaluate(rule, v, Map.of(), "any.feature");
 
 		assertThat(result.decision()).isEqualTo(Decision.DENY);
 	}

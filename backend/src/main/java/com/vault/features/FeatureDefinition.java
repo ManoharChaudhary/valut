@@ -1,6 +1,9 @@
 package com.vault.features;
 
 import java.time.Instant;
+import java.util.UUID;
+
+import jakarta.persistence.PrePersist;
 
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -25,8 +28,15 @@ public class FeatureDefinition {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
+	@JdbcTypeCode(SqlTypes.UUID)
+	@Column(name = "public_id", nullable = false, unique = true)
+	private UUID publicId;
+
 	@Column(name = "feature_key", nullable = false)
 	private String featureKey;
+
+	@Column(name = "display_name")
+	private String displayName;
 
 	/**
 	 * JSON Schema describing the required shape of the evaluation context.
@@ -45,6 +55,22 @@ public class FeatureDefinition {
 
 	public void setId(Long id) {
 		this.id = id;
+	}
+
+	public UUID getPublicId() {
+		return publicId;
+	}
+
+	public void setPublicId(UUID publicId) {
+		this.publicId = publicId;
+	}
+
+	public String getDisplayName() {
+		return displayName;
+	}
+
+	public void setDisplayName(String displayName) {
+		this.displayName = displayName;
 	}
 
 	public String getFeatureKey() {
@@ -69,6 +95,16 @@ public class FeatureDefinition {
 
 	public void setCreatedAt(Instant createdAt) {
 		this.createdAt = createdAt;
+	}
+
+	@PrePersist
+	void prePersist() {
+		if (publicId == null) {
+			publicId = UUID.randomUUID();
+		}
+		if (createdAt == null) {
+			createdAt = Instant.now();
+		}
 	}
 }
 

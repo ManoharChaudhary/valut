@@ -10,6 +10,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.vault.engine.MurmurHash3;
+import com.vault.features.FeatureDefinition;
 
 /**
  * Deterministic cache key: featureKey + stable JSON for context map (ordered keys).
@@ -25,7 +26,14 @@ public class DecisionEvaluationKeyGenerator implements KeyGenerator {
 		if (params.length < 2) {
 			return "invalid";
 		}
-		String featureKey = params[0] instanceof String s ? s : String.valueOf(params[0]);
+		String featureKey;
+		if (params[0] instanceof FeatureDefinition fd) {
+			featureKey = fd.getFeatureKey();
+		} else if (params[0] instanceof String s) {
+			featureKey = s;
+		} else {
+			featureKey = String.valueOf(params[0]);
+		}
 		@SuppressWarnings("unchecked")
 		Map<String, Object> context = params[1] instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
 

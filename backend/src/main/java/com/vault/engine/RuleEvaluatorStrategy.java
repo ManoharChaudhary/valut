@@ -14,6 +14,9 @@ import com.vault.rules.RuleVersion;
 public interface RuleEvaluatorStrategy {
 	boolean supports(Rule rule);
 
-	EvaluationResult evaluate(Rule rule, RuleVersion ruleVersion, Map<String, Object> context);
+	/**
+	 * @param evaluationFeatureKey stable key for the feature being evaluated (used by rollout hashing).
+	 */
+	EvaluationResult evaluate(Rule rule, RuleVersion ruleVersion, Map<String, Object> context, String evaluationFeatureKey);
 }
 

@@ -1,7 +1,7 @@
 package com.vault.api.decisions;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -11,6 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,6 +30,8 @@ import com.vault.engine.DecisionEngineService;
 import com.vault.engine.DecisionTrace;
 import com.vault.engine.DecisionTraceSummary;
 import com.vault.engine.EngineResult;
+import com.vault.features.FeatureDefinition;
+import com.vault.features.FeatureDefinitionRepository;
 
 @ExtendWith(MockitoExtension.class)
 class DecisionControllerTest {
@@ -37,6 +41,9 @@ class DecisionControllerTest {
 
 	@Mock
 	private DecisionEngineService decisionEngineService;
+
+	@Mock
+	private FeatureDefinitionRepository featureDefinitionRepository;
 
 	@InjectMocks
 	private DecisionController decisionController;
@@ -48,7 +55,13 @@ class DecisionControllerTest {
 
 	@Test
 	void evaluateReturnsDecisionAndTrace() throws Exception {
-		when(decisionEngineService.evaluate(anyString(), anyMap()))
+		FeatureDefinition fd = new FeatureDefinition();
+		fd.setId(1L);
+		fd.setFeatureKey("test.feature");
+		fd.setPublicId(UUID.randomUUID());
+
+		when(featureDefinitionRepository.findByFeatureKey("test.feature")).thenReturn(Optional.of(fd));
+		when(decisionEngineService.evaluate(any(FeatureDefinition.class), anyMap()))
 				.thenReturn(new EngineResult(
 						Decision.ALLOW,
 						List.of("ok"),
