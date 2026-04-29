@@ -2,19 +2,19 @@
 
 This guide explains how a typical **HTTP request** moves through a Spring Boot app like Vault, what each layer is for, and how it maps to concepts you already know from React/Next.js. The goal is to make you comfortable reading stack traces, logs, and “where does this code run?” questions—without memorizing every annotation.
 
-**Backend status:** Phases **1–4** are implemented (data model, engine, public evaluate API, caching, and event-driven cache eviction). Use this document as the **single end-to-end review** before moving to **Phase 5** (frontend). The [mentoring README](README.md) has a short delivery summary table.
+**Backend status:** Phases **1–8** are implemented (data model, engine, evaluate API, caching, events, **enterprise** schema V5–V7, scoped matching, global default rule, **admin REST**). Use this document with [phase-05](phase-05-frontend-control-plane.md) for the full stack. The [mentoring README](README.md) has a short delivery summary table.
 
 ---
 
 ## 1. The one-sentence story
 
-When the frontend calls `POST /api/v1/decisions/evaluate`, **Tomcat** receives bytes on a socket, **Spring MVC** picks the right controller method, **validation** checks the JSON shape, a **cache proxy** may return a prior result, otherwise your **service** runs business logic (schema → rules → trace + summary), **repositories** talk to Postgres via **JPA/Hibernate**, and the response is serialized back to JSON. When rules change via **`RuleAdminService`**, an **event** clears the decision cache so results stay fresh.
+When the frontend calls `POST /api/v1/decisions/evaluate`, **Tomcat** receives bytes on a socket, **Spring MVC** picks the right controller method, the controller **resolves** `FeatureDefinition` by **`featureId`** (UUID) or **`featureKey`**, a **cache proxy** may return a prior result, otherwise **`DecisionEngineService`** runs business logic (schema → scoped rules vs global default → strategies → **`DecisionResolver`** → trace + summary), **repositories** talk to Postgres via **JPA/Hibernate**, and the response is serialized back to JSON. When rules change via **`RuleAdminService`** or **`RuleManagementService`**, an **event** clears the decision cache so results stay fresh.
 
 Think of it as: **HTTP transport → router → handler → (optional cache) → domain logic → data access → response**, plus **mutation → event → cache invalidation**.
 
 ---
 
-## 2. Big-picture architecture (Vault as built — Phases 1–4)
+## 2. Big-picture architecture (Vault as built — Phases 1–4 plus enterprise extensions)
 
 This diagram is the **review map**: read it once top-to-bottom, then walk the sequence in section 3.
 
@@ -101,7 +101,6 @@ sequenceDiagram
   participant Tomcat as Tomcat
   participant MVC as DispatcherServlet
   participant Ctrl as DecisionController
-  participant HV as Bean_Validation
   participant Cache as Cacheable_proxy_Caffeine
   participant Eng as DecisionEngineService
   participant FD as FeatureDefinitionRepository
@@ -113,32 +112,30 @@ sequenceDiagram
   Browser->>Tomcat: POST /api/v1/decisions/evaluate JSON body
   Tomcat->>MVC: dispatch to Spring MVC
   MVC->>Ctrl: map path + method to evaluate(...)
-  Ctrl->>HV: validate EvaluateRequest (e.g. featureKey not blank)
-  alt validation fails
-    HV-->>Browser: 400 Bad Request
+  Ctrl->>Ctrl: require featureId or featureKey (400 if missing)
+  Ctrl->>FD: resolve FeatureDefinition by publicId or featureKey
+  FD->>PG: SQL SELECT feature_definitions
+  PG-->>FD: row or empty
+  alt feature not found
+    Ctrl-->>Browser: 404 Not Found
   end
-  Ctrl->>Cache: evaluate(featureKey, context)
+  Ctrl->>Cache: evaluate(FeatureDefinition, context)
   alt cache_hit
     Cache-->>Ctrl: cached EngineResult
   end
   alt cache_miss
     Cache->>Eng: invoke real method
-    Eng->>FD: findByFeatureKey(featureKey)
-    FD->>PG: SQL SELECT feature_definitions
-    PG-->>FD: row or empty
-    alt no feature definition
-      Eng-->>Cache: EngineResult DENY plus traceSummary
-    end
     Eng->>Val: validate(contextSchema, context)
     alt schema invalid or context fails schema
       Eng-->>Cache: EngineResult DENY plus errors
     end
-    Eng->>RR: find active rules for feature
-    RR->>PG: SQL SELECT rules
-    loop each rule
+    Eng->>RR: findActiveWithScopesForFeature(feature PK)
+    RR->>PG: SQL JOIN rules rule_features scopes
+    Eng->>Eng: filter scoped rules by RuleScopeMatcher optional global default
+    loop each rule in evaluated set
       Eng->>RVR: latest RuleVersion
       RVR->>PG: SQL SELECT rule_versions
-      Eng->>Eng: pick strategy, evaluate, append trace
+      Eng->>Eng: pick strategy evaluate with evaluationFeatureKey append trace
     end
     Eng->>Eng: DecisionResolver plus DecisionTraceSummary
     Eng-->>Cache: EngineResult(decision, reasons, trace, traceSummary)
@@ -150,7 +147,7 @@ sequenceDiagram
 **What to notice as a learner**
 
 1. **Controller is thin** — it should not embed policy. It translates HTTP ↔ Java objects.
-2. **`@Cacheable` sits on the service** — Spring’s proxy intercepts **before** the heavy work; identical `(featureKey, context)` can return without hitting Postgres (until TTL or eviction).
+2. **`@Cacheable` sits on the service** — Spring’s proxy intercepts **before** the heavy work; identical resolved feature + canonical JSON **`context`** can return without hitting Postgres (until TTL or eviction); the key generator reads **`FeatureDefinition.getFeatureKey()`** plus sorted context JSON.
 3. **Service owns orchestration** — “first validate schema, then load rules, then evaluate,” plus trace/summary assembly.
 4. **Repositories are narrow** — mostly “load/save by id/key,” not business rules.
 5. **Database is the source of truth for config** (features, rules, versions), not hard-coded constants.
@@ -189,7 +186,7 @@ sequenceDiagram
 | **DispatcherServlet** | Spring’s central “router” that finds which controller method matches URL + HTTP method | Next.js router + method dispatch for API routes |
 | **Controller (`@RestController`)** | Class whose methods handle HTTP; return values become JSON/XML/etc. | `export async function POST(request)` in App Router |
 | **DTO (Data Transfer Object)** | A shape of JSON for requests/responses (`EvaluateRequest`, `EvaluateResponse`) | Zod-inferred type or TypeScript interface for API payloads |
-| **Bean Validation (`@Valid`, `@NotBlank`)** | Declarative rules on fields; invalid input → 400 | Zod `safeParse` on the server before running logic |
+| **Request validation (evaluate)** | Controller requires **`featureId`** or **`featureKey`**; 400 if neither | Same guard in client before POST |
 | **Service (`@Service`)** | Application logic orchestrator; transactional boundaries often start here | A `lib/server/decisions.ts` module called only from server |
 | **Repository (`JpaRepository`)** | Interface for CRUD + query methods; Spring generates implementation | Prisma `db.featureDefinition.findUnique(...)` |
 | **Entity (`@Entity`)** | Java class mapped to a **table row** | Prisma model / DB row type (not the same as a DTO) |
@@ -201,9 +198,9 @@ sequenceDiagram
 | **Dependency Injection (DI)** | Spring constructs objects and injects collaborators via constructors | Less like Context; more like a framework **wiring** every import graph once at startup |
 | **`List<RuleEvaluatorStrategy>` injection** | Spring finds all `@Component` strategies and injects as a list | Plugin array: `[booleanEvaluator, rolloutEvaluator, ...]` |
 | **`@Cacheable` + Caffeine** | Method result memoized in-process by a generated proxy; key from `KeyGenerator` | `useMemo` / deduped server fetch keyed by stable hash |
-| **`KeyGenerator` / deterministic key** | Stable cache key from `featureKey` + canonical JSON context | Stable React Query `queryKey` |
+| **`KeyGenerator` / deterministic key** | Stable cache key from resolved **`featureKey`** + canonical JSON context | Stable React Query `queryKey` |
 | **`ApplicationEventPublisher` / `@EventListener`** | In-process pub/sub after domain changes | Emitting a custom event bus message after mutation |
-| **`RuleUpdatedEvent` + listener** | Rule writes trigger cache eviction (and future audit hooks) | `invalidateQueries` after a successful mutation |
+| **`RuleUpdatedEvent` + listener** | Publishes **`affectedFeatureKeys`** + `ruleId`; listener clears `decisions` cache | `invalidateQueries` after a successful mutation |
 
 ---
 
@@ -370,7 +367,7 @@ curl -s http://localhost:8080/actuator/health
 - **Phase 2:** engine strategies + hierarchy + deny-wins resolver + trace entries. See [phase-02-core-engine.md](phase-02-core-engine.md).
 - **Phase 3:** JSON Schema pre-check + `POST /evaluate` + response trace/summary fields. See [phase-03-schema-validation-and-api.md](phase-03-schema-validation-and-api.md).
 - **Phase 4:** Caffeine cache + deterministic keys + `RuleUpdatedEvent` eviction. See [phase-04-caching-and-events.md](phase-04-caching-and-events.md).
-- **Phase 5 (next):** Next.js control plane — see [phase-05-frontend-control-plane.md](phase-05-frontend-control-plane.md).
+- **Phase 5+:** Next.js control plane + enterprise UI — see [phase-05-frontend-control-plane.md](phase-05-frontend-control-plane.md) and root **`execution-plan.md`**.
 
 ---
 
@@ -381,15 +378,16 @@ Use this table when you **code-review** or explain Vault to someone else. Packag
 | Step | Responsibility | Main types |
 |------|----------------|------------|
 | 1 | HTTP + JSON binding | `api.decisions.DecisionController`, `EvaluateRequest`, `EvaluateResponse` |
-| 2 | DTO validation | Bean Validation on `EvaluateRequest` |
-| 3 | Cache lookup | `@Cacheable` on `engine.DecisionEngineService.evaluate` |
-| 4 | Feature contract | `features.FeatureDefinition` + `FeatureDefinitionRepository` |
+| 2 | Feature resolution | `findByPublicId` / `findByFeatureKey` on `FeatureDefinitionRepository` |
+| 3 | Cache lookup | `@Cacheable` on `engine.DecisionEngineService.evaluate(FeatureDefinition, Map)` |
+| 4 | Feature contract | `features.FeatureDefinition` (`public_id`, `context_schema`) |
 | 5 | Context JSON Schema | `validation.ContextSchemaValidator` |
-| 6 | Rule load + order | `rules.RuleRepository`, `RuleVersionRepository` |
-| 7 | Per-type evaluation | `engine.*RuleEvaluator`, `RuleEvaluatorStrategy` |
+| 6 | Rule load + scopes | `rules.RuleRepository.findActiveWithScopesForFeature`, `RuleScopeMatcher`, optional global default |
+| 7 | Per-type evaluation | `engine.*RuleEvaluator`, `RuleEvaluatorStrategy` (+ `evaluationFeatureKey`) |
 | 8 | Merge + explain | `DecisionResolver`, `DecisionTraceSummary`, `EngineResult` |
-| 9 | Rule append + freshness | `rules.RuleAdminService`, `RuleUpdatedEvent`, `cache.RuleCacheEvictionListener` |
-| 10 | Schema migrations | `resources/db/migration/V*.sql` (Flyway) |
+| 9 | Rule append + freshness | `rules.RuleAdminService`, `RuleUpdatedEvent` (feature key list), `cache.RuleCacheEvictionListener` |
+| 10 | Admin rule CRUD | `admin.RuleManagementService`, `api.admin.*Controller` |
+| 11 | Schema migrations | `resources/db/migration/V*.sql` through **V7** (Flyway) |
 
 **Default-deny reminder:** missing feature, failed schema, no rules, or internal gaps → **DENY** with reasons in the JSON body (not always HTTP 4xx).
 
@@ -407,6 +405,6 @@ Use this table when you **code-review** or explain Vault to someone else. Packag
 - **Bean:** object managed by Spring’s container.
 - **Profile (`local`)**: configuration variant for dev machines (`application-local.yml`).
 
-**What’s next for the product:** implement **Phase 5** (Next.js simulator + CORS/proxy) — see [phase-05-frontend-control-plane.md](phase-05-frontend-control-plane.md).
+**What’s next for the product:** optional UI rule builder, audit logging (see TODO on `RuleManagementService`), feature-scoped cache eviction — see **`execution-plan.md`** optional follow-ups.
 
 **Optional follow-up docs** (add when you need them): **`@Transactional` boundaries**, **lazy loading pitfalls**, **integration vs slice tests**, **production hardening** (auth, rate limits, metrics on cache hit rate).

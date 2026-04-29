@@ -1,28 +1,87 @@
-Let's build "Vault – Enterprise Decision & Entitlement Engine". I am an expert in Frontend but new to Spring Boot and enterprise backend patterns. I need you to guide me phase-by-phase, explaining the backend concepts clearly and telling me how to verify the work locally.
+Let's build **Vault – Enterprise Decision & Entitlement Engine**. I am an expert in Frontend but new to Spring Boot and enterprise backend patterns. I need you to guide me phase-by-phase, explaining the backend concepts clearly and telling me how to verify the work locally.
 
-Also, I need the git history to look like I built this organically over the last 10 weeks (roughly 2-3 months). For every step we complete, provide the exact `git commit` command with a realistic backdated timestamp, starting from roughly 10 weeks ago.
+I also need **git history** to look like organic work over roughly **2–3 months**. For each completed slice, use a realistic **backdated** commit, for example:
 
-Here is our Agile Execution Plan. Let's start with **Phase 1, Task 1.1**. Do not move to the next task until I say "Next".
+`GIT_COMMITTER_DATE="2026-04-15 14:00:00" git commit --date="2026-04-15 14:00:00" -m "feat: …"`
 
-### Phase 1: Foundation & Data Modeling (Simulated Time: Weeks 1-2)
-- [ ] **Task 1.1:** Initialize the Spring Boot project (Web, JPA, PostgreSQL, Validation). Explain the project structure to me.
-- [ ] **Task 1.2:** Create the `Tenant` and `FeatureDefinition` entities. The `FeatureDefinition` must include a `contextSchema` field (JSONB) to enforce what context keys are required for this feature.
-- [ ] **Task 1.3:** Create the `Rule` and `RuleVersion` entities. Ensure `RuleVersion` maps conditions to Postgres JSONB. Explain how Spring Data JPA works here.
+Space commits **1–3 per week**, **weekdays only**, unless you intentionally want a weekend spike.
 
-### Phase 2: The Core Rule Engine (Simulated Time: Weeks 3-4)
-- [ ] **Task 2.1:** Implement the Strategy Pattern for rule evaluation. Create the interface and the `BooleanRuleEvaluator`. Explain how Spring manages these beans.
-- [ ] **Task 2.2:** Implement the `RolloutRuleEvaluator`. Use a deterministic hashing strategy (like MurmurHash3) on `feature_key + context.id` so rollouts are sticky.
-- [ ] **Task 2.3:** Implement the core `DecisionEngineService` that orchestrates the evaluation hierarchy (Global -> Sector -> Tenant). Implement the explicit fallback: if no rules match, return DENY.
+---
 
-### Phase 3: Schema Validation & The API (Simulated Time: Weeks 5-6)
-- [ ] **Task 3.1:** Implement the pre-evaluation Context Validator. Before the engine runs, it must check the incoming context against the `FeatureDefinition.contextSchema`.
-- [ ] **Task 3.2:** Build the `DecisionController` with the `POST /api/v1/decisions/evaluate` endpoint. 
-- [ ] **Task 3.3:** Implement the `DecisionTrace` object so the API response shows exactly which rules passed/failed and why. Provide `curl` commands so I can test this.
+## Baseline (Phases 1–5) — **delivered in repo**
 
-### Phase 4: Performance & Caching (Simulated Time: Weeks 7-8)
-- [ ] **Task 4.1:** Integrate Caffeine Cache for the evaluation endpoint. Explain how `@Cacheable` works and how we generate a unique cache key from the JSON context.
-- [ ] **Task 4.2:** Implement Spring Application Events. When a `Rule` is updated, publish an event that evicts the specific cache entry. Explain how Spring Events decouple the code.
+Original mentoring track; treat as **done** unless we explicitly reopen something.
 
-### Phase 5: The Frontend Control Plane (Simulated Time: Weeks 9-10)
-- [ ] **Task 5.1:** Set up the Next.js (App Router) project in a `/frontend` folder. 
-- [ ] **Task 5.2:** Build the "Rule Simulator" UI page where a user can enter a JSON context, hit the Spring Boot API, and see a visual timeline of the `DecisionTrace`. (I will take the lead on making this look good, just set up the wiring and React Query).
+- [x] **Phase 1 — Foundation & data modeling:** Spring Boot, JPA, `Tenant`, `FeatureDefinition` (+ `context_schema` JSONB), `Rule`, `RuleVersion`.
+- [x] **Phase 2 — Core engine:** Strategy evaluators (`Boolean`, `Rollout` + deterministic hash), `DecisionEngineService`, hierarchy ordering, **default deny** if nothing allows.
+- [x] **Phase 3 — Schema & public API:** `ContextSchemaValidator`, `POST /api/v1/decisions/evaluate`, `DecisionTrace` / summary in JSON.
+- [x] **Phase 4 — Performance:** Caffeine + `@Cacheable`, domain events + cache eviction on rule writes.
+- [x] **Phase 5 — Frontend MVP:** Next.js **App Router** (repo: **Next 15**), TanStack Query, `/vault-api` rewrite, decision simulator.
+
+---
+
+## Locked decisions (enterprise upgrade) — **as implemented**
+
+| Topic | Decision |
+|--------|-----------|
+| **Identifiers** | **`public_id` (UUID)** on tenants, features, sectors, roles; **`bigserial`** PKs retained. |
+| **Multi-feature rules** | **`rule_features`** M:N between `rules` and `feature_definitions`; legacy `rules.feature_key` removed after backfill. |
+| **Sectors / roles** | Tables **`sectors`** (code), **`roles`** (name); scopes link to numeric FKs; evaluation context uses **`tenant_id`** (tenant UUID string or legacy id match), **`sector`** (code), **`role_id`** (role UUID) and optional **`role_name`**. |
+| **Scopes** | **`rule_tenant_scopes`**, **`rule_sector_scopes`**, **`rule_role_scopes`**; **empty lists = wildcard** on that axis. |
+| **Global default rule** | **Exactly one** row with **`is_default = true`** in **`rules`** (partial unique index). Linked to features via **`rule_features`**. If no non-default rule **matches** scopes for the request, engine evaluates that default **only when** it is linked to the resolved feature; else **DENY** if no scoped match. |
+| **Conflict policy** | **`DecisionResolver`**: **DENY wins** across evaluated trace entries (unchanged). |
+| **Evaluate API** | Request body supports **`featureId`** (UUID, `feature_definitions.public_id`) **or** **`featureKey`**; **`context`** still validated per feature JSON Schema. |
+| **API vocabulary** | **`ALLOW` / `DENY`** in JSON; UI may label **Permit / Deny**. |
+| **Admin security** | **MVP: no auth** on `/api/v1/admin/**` (internal-only). |
+| **Frontend** | **Slate-950** shell, primary **`#3B82F6`**, **emerald / rose** for permit/deny; modular **`RuleCard`**, **`DecisionBreadcrumbs`**; admin list pages + simulator with **`featureId`**. |
+
+---
+
+## Phase 6 — PostgreSQL expansion & seeds — **delivered**
+
+- [x] **Task 6.1–6.5:** Flyway **V5** — catalogs, UUID columns, `rule_features`, `rule_name`, `is_default`, scope tables, migrate `feature_key` → junction; **V6** seeds sectors, roles, tenants, three core features with **`context_schema` requiring `tenant_id`, `sector`, `role_id`**; **V7** optional global default boolean rule + version linked to all features.
+
+**Verify:** `./mvnw flyway:migrate` (with Postgres); `SELECT` counts on new tables.
+
+---
+
+## Phase 7 — Scoped matching + default fallback — **delivered**
+
+- [x] **`RuleScopeMatcher`**, **`DecisionEngineService`** partition scoped vs default, filter scoped by context, fallback to global default rule with feature link, **`RuleEvaluatorStrategy`** extended with **`evaluationFeatureKey`** for rollout hashing.
+- [x] **`DecisionEvaluationKeyGenerator`** resolves **`FeatureDefinition`** for cache key.
+- [x] **`RuleUpdatedEvent`** carries **`List<String> affectedFeatureKeys`**.
+- [x] **`// TODO: Add audit logging for rule changes`** on **`RuleManagementService`** mutations.
+
+**Verify:** `./mvnw test`; manual `curl` with **`featureId`** + seeded UUIDs for tenant/role.
+
+---
+
+## Phase 8 — Admin HTTP API — **delivered**
+
+- [x] **`/api/v1/admin/tenants`**, **`/sectors`**, **`/roles`**, **`/features`**, **`/rules`** CRUD (JSON); **`POST /api/v1/admin/rules/{id}/versions`** appends versions via **`RuleAdminService`**; **`RuleManagementService`** clears all default flags before promoting a new default.
+
+**Verify:** `curl` CRUD smoke; second concurrent default prevented by DB + service clear.
+
+---
+
+## Phase 9–11 — Frontend shell, admin lists, simulator UX — **delivered (MVP)**
+
+- [x] **Design system:** `clsx` + `tailwind-merge`, **`cn()`**, reusable **`Button`**, **`Card`**, **`Input`**, **`Label`**, **`Badge`**, **`AppShell`** nav.
+- [x] **`/admin/features`**, **`/admin/rules`** list views calling admin APIs.
+- [x] **Simulator:** **`featureId`** selector + scope fields + merge JSON; **`DecisionBreadcrumbs`** waterfall readout + improved contrast on slate.
+
+**Verify:** `cd frontend && npm run build`; run backend + `npm run dev`, exercise `/simulator` and admin routes.
+
+---
+
+## Optional follow-ups (not required for MVP)
+
+- [ ] Full **rule create/edit form** in UI (currently API-first + list review).
+- [ ] **Per-tenant** audit log implementation (replace TODO).
+- [ ] **Feature-scoped** cache eviction instead of full **`decisions`** clear.
+
+---
+
+## What to say next
+
+For **new** mentoring slices (docs-only, tests, or follow-ups), say **"Next"** and name the optional follow-up line you want to tackle.

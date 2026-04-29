@@ -31,7 +31,7 @@ Rough analogy: a **memoized** pure function wrapper around your server handler �
 ## Task 4.2 — Spring events + cache eviction (done)
 
 ### What we added
-- **`RuleUpdatedEvent`** — `backend/src/main/java/com/vault/rules/RuleUpdatedEvent.java` (carries `featureKey` + `ruleId`).
+- **`RuleUpdatedEvent`** — `backend/src/main/java/com/vault/rules/RuleUpdatedEvent.java` (carries affected **`featureKey` list** + `ruleId`).
 - **`RuleAdminService`** — `backend/src/main/java/com/vault/rules/RuleAdminService.java`
   - `appendRuleVersion(...)` saves a new `RuleVersion` and publishes **`RuleUpdatedEvent`** after persist (same `@Transactional` boundary).
   - Use this (or the same event) for future admin REST so caches stay coherent.

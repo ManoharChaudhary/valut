@@ -35,12 +35,18 @@ SPRING_PROFILES_ACTIVE=local SERVER_PORT=8081 ./mvnw spring-boot:run
 curl -s http://localhost:8080/actuator/health
 ```
 
-Evaluate (POST only):
+Evaluate (POST only). Use **`featureKey`** or **`featureId`** (feature `public_id` UUID); seeded core features require **`tenant_id`**, **`sector`**, and **`role_id`** in `context` (see Flyway **V6**).
 
 ```bash
+# By featureKey (when that row exists)
 curl -s -X POST http://localhost:8080/api/v1/decisions/evaluate \
   -H "Content-Type: application/json" \
-  -d '{"featureKey":"demo.feature","context":{"tenant_id":"t-1"}}'
+  -d '{"featureKey":"core.user_management","context":{"tenant_id":"c1111111-1111-4111-8111-111111111111","sector":"BIGSEG","role_id":"b1111111-1111-4111-8111-111111111111"}}'
+
+# By featureId (UUID from GET /api/v1/admin/features)
+curl -s -X POST http://localhost:8080/api/v1/decisions/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{"featureId":"d1111111-1111-4111-8111-111111111111","context":{"tenant_id":"c1111111-1111-4111-8111-111111111111","sector":"BIGSEG","role_id":"b1111111-1111-4111-8111-111111111111"}}'
 ```
 
 ## Unit tests (no DB required for most tests)
@@ -61,7 +67,7 @@ order by installed_rank;
 ```
 
 ## Caching (Phase 4)
-In-memory **Caffeine** cache (`decisions`) wraps `DecisionEngineService.evaluate` with a **5 minute** write TTL (see `application.yml`). After **`RuleAdminService.appendRuleVersion`**, a `RuleUpdatedEvent` clears the `decisions` cache so clients are not stuck until TTL (see Phase 4 Task 4.2).
+In-memory **Caffeine** cache (`decisions`) wraps `DecisionEngineService.evaluate` with a **5 minute** write TTL (see `application.yml`). After **`RuleAdminService.appendRuleVersion`** or **`RuleManagementService`** mutations, a **`RuleUpdatedEvent`** clears the `decisions` cache so clients are not stuck until TTL (see Phase 4 Task 4.2).
 
 ## Related reading
 - [backend-foundations-and-request-flow.md](backend-foundations-and-request-flow.md)
