@@ -2,6 +2,9 @@
 
 This folder is the long-lived “engineering journal” for the Vault project.
 
+## Start here (frontend → backend bridge)
+- [backend-foundations-and-request-flow.md](backend-foundations-and-request-flow.md) — HTTP → MVC → validation → services → JPA → DB, with diagrams, analogies, and debugging.
+
 ## How to use
 - Read **phase notes** in order. Each phase doc contains:
   - What we built
